@@ -10,14 +10,14 @@ import Emissary
 import Mensa
 
 public protocol RenderableDisplayed: Renderable, Displayed where Item: Hashable {
-    associatedtype T: Size
+    associatedtype SizeType: Size
     
-    func resourceMap(for item: Item) -> ResourceMap<T>
+    func resourceMap(for item: Item) -> ResourceMap<SizeType>
 }
 
 public extension RenderableDisplayed {
-    func resourceMap(for item: Item) -> ResourceMap<T> {
-        return ResourceMap<T>()
+    func resourceMap(for item: Item) -> ResourceMap<SizeType> {
+        return ResourceMap<SizeType>()
     }
     
     func render(displaying item: Item, with variant: DisplayVariant, update: @escaping () -> Void = {}) {
@@ -27,7 +27,7 @@ public extension RenderableDisplayed {
     }
     
     static func info(for item: Item, variant: DisplayVariant) -> (String, String) {
-        let rerenderKey = "\(item.hashValue)"
+        let rerenderKey = String(describing: item.hashValue)
         let key = "\(rerenderKey)\(self)\(variant.rawValue)"
         return (key, rerenderKey)
     }

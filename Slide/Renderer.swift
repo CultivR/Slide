@@ -24,8 +24,14 @@ public struct Renderer {
     static private var rerenderKeys = Set<String>()
     static private var animatingKeys: [String: Bool] = [:]
     static private var deferredAction: (() -> Void)?
+    
+    static func render(_ view: UIView & Renderable) {
+        let key = String(describing: type(of: view))
+        let resourceMap = ResourceMap<EmptySize>()
+        render(view, key: key, resourceMap: resourceMap)
+    }
 
-    static func render<T>(_ view: UIView & Renderable, key: String, rerenderKey: String?, resourceMap: ResourceMap<T>, update: @escaping () -> Void = {}) {
+    static func render<SizeType>(_ view: UIView & Renderable, key: String, rerenderKey: String? = nil, resourceMap: ResourceMap<SizeType>, update: @escaping () -> Void = {}) {
         var view = view
         view.cancelRender()
         view.prepare(with: key)
@@ -42,12 +48,6 @@ public struct Renderer {
         }
     }
     
-    static func cancelRendering(for view: UIView & Renderable) {
-        renderTasks.object(forKey: view)?.cancel()
-    }
-}
-
-public extension Renderer {
     static func setAnimating(_ animating: Bool, for key: String) {
         if animating {
             animatingKeys[key] = true
@@ -60,6 +60,12 @@ public extension Renderer {
         }
     }
     
+    static func cancelRendering(for view: UIView & Renderable) {
+        renderTasks.object(forKey: view)?.cancel()
+    }
+}
+
+public extension Renderer {
     static func performAfterAnimations(_ action: @escaping () -> Void) {
         if isAnimating {
             deferredAction = action
@@ -69,7 +75,7 @@ public extension Renderer {
     }
     
     static func setNeedsRendering<T: Hashable>(for item: T) {
-        let rerenderKey = "\(item.hashValue)"
+        let rerenderKey = String(describing: item.hashValue)
         setNeedsRendering(for: rerenderKey)
     }
 }
@@ -83,14 +89,14 @@ private extension Renderer {
         rerenderKeys.insert(key)
     }
     
-    static func restartProcessing<T>(for resourceMap: ResourceMap<T>) {
+    static func restartProcessing<SizeType>(for resourceMap: ResourceMap<SizeType>) {
         for (imageDisplaying, resource) in resourceMap {
             let image = cachedImage(forURL: resource.url)
             imageDisplaying.setImage(image, update: false, animated: false)
         }
     }
     
-    static func performRender<T>(_ view: UIView & Renderable, key: String, resourceMap: ResourceMap<T>, update: @escaping () -> Void = {}) {
+    static func performRender<SizeType>(_ view: UIView & Renderable, key: String, resourceMap: ResourceMap<SizeType>, update: @escaping () -> Void = {}) {
         view.cancelRender()
         renderTasks.setObject(renderTask(for: view, with: key, update: update), forKey: view)
         renderTasks.object(forKey: view)!.success { [weak view] rendering in
@@ -104,7 +110,7 @@ private extension Renderer {
         }
     }
     
-    static func process<T>(_ view: UIView & Renderable, key: String, resourceMap: ResourceMap<T>, update: @escaping () -> Void = {}) {
+    static func process<SizeType>(_ view: UIView & Renderable, key: String, resourceMap: ResourceMap<SizeType>, update: @escaping () -> Void = {}) {
         processTasks.object(forKey: view)?.cancel()
         processTasks.setObject(processTask(for: key, resourceMap: resourceMap), forKey: view)
         processTasks.object(forKey: view)!.progress { [weak view] _, progress in
@@ -131,11 +137,12 @@ private extension Renderer {
         }
     }
     
-    static func processTask<T>(for key: String, resourceMap: ResourceMap<T>) -> ProcessTask {
+    static func processTask<SizeType>(for key: String, resourceMap: ResourceMap<SizeType>) -> ProcessTask {
         return Task { progress, fulfill, reject, configure in
             for (imageDisplaying, resource) in resourceMap {
-                let url = resource.url
                 guard imageDisplaying.image == nil else { continue }
+                
+                let url = resource.url
                 fetchCachedImage(forURL: url).success { image in
                     progress((imageDisplaying, image))
                     cacheImage(image, forURL: url, toDisk: false)
@@ -189,3 +196,13 @@ private extension Int {
 }
 
 enum RenderError: Error {}
+
+enum EmptySize: Int {
+    case empty
+}
+
+extension EmptySize: Size {
+    static var key: String {
+        return "size"
+    }
+}

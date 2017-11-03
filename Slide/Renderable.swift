@@ -15,6 +15,12 @@ public protocol Renderable where Self: UIView {
     var renderedView: RenderedImageView! { get set }
 }
 
+public extension Renderable {
+    func render() {
+        Renderer.render(self)
+    }
+}
+
 extension Renderable {
     mutating func prepare(with key: String) {
         guard renderedView == nil else { return }
